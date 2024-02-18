@@ -23,13 +23,25 @@ class Skater():
     name: str
     position: str
     games: dict = field(default_factory=dict, repr=False)
-    def add_game(self):
-        pass
+    def add_game(self, game, ga, gf10, ogf10):
+        gameid = game["gameId"]
+        points = game["points"]
+        toi = self.toi_to_minutes(game["toi"])
+        self.games[id] = {"P": points, "TOI": toi, "GA": ga, "GF10": gf10, "OGF10": ogf10, "O": points/(toi+oga10), "D": ga/(toi+ogf10)}
+    def toi_to_minutes(self, toi):
+        min, sec = toi.split(":")
+        real_toi = float(min) + float(sec)/60
+        return real_toi
 
 @dataclass
 class Goalie():
     id: str
     name: str
     games: dict = field(default_factory=dict, repr=False)
-    def add_game(self):
-        pass
+    def add_game(self, game):
+        toi = self.toi_to_minutes(game["toi"])
+        self.games[id] = {"GA": game["goalsAgainst"], "TOI": toi}
+    def toi_to_minutes(self, toi):
+        min, sec = toi.split(":")
+        real_toi = float(min) + float(sec)/60
+        return real_toi

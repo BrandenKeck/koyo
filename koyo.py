@@ -5,18 +5,15 @@ import pprint as pp
 from datetime import date
 from datastruct import Team, Skater, Goalie
 
+import os
+os.environ["CURL_CA_BUNDLE"]=""
+
 # Load Components
 with open('teams.json', 'r') as f:
     teamdict = json.load(f)
 teams = {t:Team(t) for t in teamdict.values()}
 skaters = {}
 goalies = {}
-
-# TOI Function
-def toi_to_minutes(toi):
-    min, sec = toi.split(":")
-    real_toi = float(min) + float(sec)/60
-    return real_toi
 
 # Construct Rosters
 for t in teams:
@@ -31,8 +28,20 @@ for t in teams:
         name = f'{g0ly["firstName"]["default"]} {g0ly["lastName"]["default"]}'
         goalies[gid] = Goalie(gid, name)
 
+# Build Games - Goalie Statistics
+for gid in goalies:
+    resp = requests.get(f"https://api-web.nhle.com/v1/player/{gid}/game-log/20232024/2").json()
+    for game in resp["gameLog"]:
+        gameid = game["gameId"]
+        teamid = game["teamAbbrev"]
+        oppid = game["opponentAbbrev"]
+        if gameid in teams[teamid].games and gameid in teams[oppid].games:
+            gf10 = teams[teamid].games[gameid]["GF10"]
+            ga = teams[oppid].games[gameid]["GA"]
+            skaters[skid].add_game(game, gf10, ga)
+
 # Build Games - Team Statistics
-curr = "2023-10-10"
+curr = "2023-09-01"
 end = "2023-12-31"
 while True:
     resp = requests.get(f"https://api-web.nhle.com/v1/score/{curr}").json()
@@ -48,22 +57,34 @@ for t in teams:
     teams[t].roll_stats()
 
 
+teams["PIT"].games
+
+pp.pprint(resp)
+pp.pprint(game)
+
+
+resp = requests.get(f"https://api-web.nhle.com/v1/player/{8477967}/game-log/20232024/2").json()
+
+resp["gameLog"][0]["gameId"]
+resp["gameLog"][0]["toi"]
+resp["gameLog"][0]["goalsAgainst"]
+resp["gameLog"][0]["gameId"]
+pp.pprint(resp)
+
+
+
 # Build Games - Player Statistics
 for skid in skaters:
     print(skid)
     resp = requests.get(f"https://api-web.nhle.com/v1/player/{skid}/game-log/20232024/2").json()
     for game in resp["gameLog"]:
         gameid = game["gameId"]
-        gf10 = teams[game["teamAbbrev"]].games[gameid]["GF10"]
-        ga10 = teams[game["opponentAbbrev"]].games[gameid]["GA10"]
-        skaters[skid]
-        
-        toi_to_minutes(game["toi"])
-        game["goals"]
-        game["assists"]
-        game["points"]
-        
-        game["opponentAbbrev"]
+        teamid = game["teamAbbrev"]
+        oppid = game["opponentAbbrev"]
+        if gameid in teams[teamid].games and gameid in teams[oppid].games:
+            gf10 = teams[teamid].games[gameid]["GF10"]
+            ga = teams[oppid].games[gameid]["GA"]
+            skaters[skid].add_game(game, gf10, ga)
 
 
 pp.pprint(xx)
