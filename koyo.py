@@ -1,12 +1,14 @@
 # Import Libraries
-import json, requests
+import json, math, requests
+import numpy as np
 import pandas as pd
 import pprint as pp
 from datetime import date
-from datastruct import Team, Skater, Goalie
+from difflib import get_close_matches
+from datastruct import Team, Skater, Goalie, KoyoData, toi_to_minutes
 
-import os
-os.environ["CURL_CA_BUNDLE"]=""
+# import os
+# os.environ["CURL_CA_BUNDLE"]=""
 
 # Load Components
 with open('teams.json', 'r') as f:
@@ -14,6 +16,21 @@ with open('teams.json', 'r') as f:
 teams = {t:Team(t) for t in teamdict.values()}
 skaters = {}
 goalies = {}
+data = {}
+
+# 
+def skater_lookup(name):
+    invdict = {skaters[s].name:skaters[s].id for s in skaters}
+    invlist = list(invdict.keys())
+    skname = get_close_matches(name, invlist, n=1)[0]
+    skid = invdict[skname]
+    return skid
+
+def primary_goalie(goalies):
+    tois = len(goalies)*[0]
+    for i, g in enumerate(goalies): tois[i] = toi_to_minutes(g['toi'])
+    maxg = np.argmax(tois)
+    return goalies[maxg]["playerId"]
 
 # Construct Rosters
 for t in teams:
@@ -28,21 +45,9 @@ for t in teams:
         name = f'{g0ly["firstName"]["default"]} {g0ly["lastName"]["default"]}'
         goalies[gid] = Goalie(gid, name)
 
-# Build Games - Goalie Statistics
-for gid in goalies:
-    resp = requests.get(f"https://api-web.nhle.com/v1/player/{gid}/game-log/20232024/2").json()
-    for game in resp["gameLog"]:
-        gameid = game["gameId"]
-        teamid = game["teamAbbrev"]
-        oppid = game["opponentAbbrev"]
-        if gameid in teams[teamid].games and gameid in teams[oppid].games:
-            gf10 = teams[teamid].games[gameid]["GF10"]
-            ga = teams[oppid].games[gameid]["GA"]
-            skaters[skid].add_game(game, gf10, ga)
-
 # Build Games - Team Statistics
 curr = "2023-09-01"
-end = "2023-12-31"
+end = "2024-01-31"
 while True:
     resp = requests.get(f"https://api-web.nhle.com/v1/score/{curr}").json()
     for game in resp["games"]:
@@ -56,109 +61,71 @@ while True:
 for t in teams:
     teams[t].roll_stats()
 
-
-teams["PIT"].games
-
-pp.pprint(resp)
-pp.pprint(game)
-
-
-resp = requests.get(f"https://api-web.nhle.com/v1/player/{8477967}/game-log/20232024/2").json()
-
-resp["gameLog"][0]["gameId"]
-resp["gameLog"][0]["toi"]
-resp["gameLog"][0]["goalsAgainst"]
-resp["gameLog"][0]["gameId"]
-pp.pprint(resp)
-
-
-
 # Build Games - Player Statistics
-for skid in skaters:
-    print(skid)
-    resp = requests.get(f"https://api-web.nhle.com/v1/player/{skid}/game-log/20232024/2").json()
-    for game in resp["gameLog"]:
-        gameid = game["gameId"]
-        teamid = game["teamAbbrev"]
-        oppid = game["opponentAbbrev"]
-        if gameid in teams[teamid].games and gameid in teams[oppid].games:
-            gf10 = teams[teamid].games[gameid]["GF10"]
-            ga = teams[oppid].games[gameid]["GA"]
-            skaters[skid].add_game(game, gf10, ga)
+for szn in ["20232024"]:#["20212022", "20222023", "20232024"]:
+    for skid in skaters:
+        resp = requests.get(f"https://api-web.nhle.com/v1/player/{skid}/game-log/{szn}/2").json()
+        for game in resp["gameLog"]:
+            gameid = game["gameId"]
+            teamid = game["teamAbbrev"]
+            oppid = game["opponentAbbrev"]
+            if gameid in teams[oppid].games and gameid in teams[oppid].games:
+                ga = teams[teamid].games[gameid]["GA"]
+                ogf10 = teams[oppid].games[gameid]["GF10"]
+                oga10 = teams[oppid].games[gameid]["GA10"]
+                if not math.isnan(ogf10) and not math.isnan(oga10):
+                    skaters[skid].add_game(game, ga, ogf10, oga10)
+for s in skaters:
+    skaters[s].roll_stats()
 
+# Build Games - Goalie Statistics
+for szn in ["20232024"]:#["20212022", "20222023", "20232024"]:
+    for gid in goalies:
+        resp = requests.get(f"https://api-web.nhle.com/v1/player/{gid}/game-log/{szn}/2").json()
+        for game in resp["gameLog"]:
+            gameid = game["gameId"]
+            oppid = game["opponentAbbrev"]
+            if gameid in teams[oppid].games:
+                ogf10 = teams[oppid].games[gameid]["GF10"]
+                if not math.isnan(ogf10):
+                    goalies[gid].add_game(game, ogf10)
+for g in goalies:
+    goalies[g].roll_stats()
 
-pp.pprint(xx)
+# Construct a list of games in the system
+games = []
+for t in teams:
+    games = games + list(teams[t].games.keys())
+games = list(set(games))
 
+# Construct Dataset - ONGOING
+for game in games[0:1]:
+    resp = requests.get(f"https://api-web.nhle.com/v1/gamecenter/{game}/boxscore").json()
+    for homeaway in ["home", "away"]:
+        sk8rs = resp["boxscore"]["playerByGameStats"]["awayTeam"]["forwards"] + resp["boxscore"]["playerByGameStats"]["awayTeam"]["defense"]
+        sk8rs = [sk["playerId"] for sk in sk8rs]
+        g0ly = primary_goalie(resp["boxscore"]["playerByGameStats"]["awayTeam"]["goalies"])
 
-teams["PIT"].games
+pp.pprint(resp)
 
+resp.keys()
+resp["boxscore"]["playerByGameStats"]["awayTeam"]["defense"][0]
+len(resp["boxscore"]["playerByGameStats"]["awayTeam"]["defense"])
+resp["boxscore"]["playerByGameStats"]["awayTeam"]["forwards"][0]
+len(resp["boxscore"]["playerByGameStats"]["awayTeam"]["forwards"])
+resp["boxscore"]["playerByGameStats"]["awayTeam"]["goalies"][0]
+len(resp["boxscore"]["playerByGameStats"]["awayTeam"]["goalies"])
+primary_goalie(resp["boxscore"]["playerByGameStats"]["awayTeam"]["goalies"])
 
-pp.pprint(game)
-
-scores = []
-
-
-xx = requests.get("https://api-web.nhle.com/v1/club-stats/TOR/20232024/2").json()
-pp.pprint(xx)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-kk = koyo()
-for t in teams.values():
-    koyo.add_team(t)
-
-roster = requests.get(https://api-web.nhle.com/v1/roster/{t}/current).json()
-pp.pprint(roster['forwards'])
-pp.pprint(roster['defensemen'])
-pp.pprint(roster['goalies'])
-
-sch = requests.get(fhttps://api-web.nhle.com/v1/schedule/{date.today()}).json()
-games = sch["gameWeek"][0]["games"]
-for game in games:
-    id = game["id"]
-    home = game["homeTeam"]["abbrev"]
-    away = game["awayTeam"]["abbrev"]
-    print(f'ID: {id} |Home: {home} | Away: {away}')
-len(resp['defensemen'])
-len(resp['forwards'])
-len(resp['goalies'])
-
-last5 = []
-for game in resp['gameLog'][:5]:
-    last5.append({
-        'goals': game['goals'],
-        'assists': game['assists'],
-        'shots': game['assists'],
-        'toi': game['toi']
-    })
-pp.pprint(last5)
-
-resp = requests.get(fhttps://api-web.nhle.com/v1/player/8477967/game-log/20232024/2).json()
-last5 = []
-for game in resp['gameLog'][:5]:
-    last5.append({
-        'savePctg': game['savePctg'],
-        'shotsAgainst': game['shotsAgainst'],
-        'goalsAgainst': game['goalsAgainst'],
-        'toi': game['toi']
-    })
-pp.pprint(last5)
 
 # Parters:
     # 9: DraftKings
     # 7: FanDuel
-pp.pprint(games)
+# sch = requests.get(f"https://api-web.nhle.com/v1/schedule/{date.today()}").json()
+# games = sch["gameWeek"][0]["games"]
+# for game in games:
+#     id = game["id"]
+#     home = game["homeTeam"]["abbrev"]
+#     away = game["awayTeam"]["abbrev"]
+#     print(f'ID: {id} |Home: {home} | Away: {away}')
+# pp.pprint(games)
