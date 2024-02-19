@@ -38,8 +38,8 @@ class Skater():
             self.games[gameid] = {
                 "P": points, 
                 "TOI": toi, 
-                "O": points/(toi+oga10), 
-                "D": ga/(toi+ogf10)
+                "O": (toi/60)*(points/oga10), 
+                "D": (toi/60)*(ga/ogf10)
             }
     def roll_stats(self, win=10):
         if bool(self.games):
@@ -61,7 +61,7 @@ class Goalie():
             self.games[gameid] = {
                 "GA": ga, 
                 "TOI": toi, 
-                "G": ga/(toi+ogf10)
+                "G": (60/toi)*(ga/ogf10)
             }
     def roll_stats(self, win=10):
         if bool(self.games):
@@ -72,8 +72,17 @@ class Goalie():
 @dataclass
 class KoyoData():
     game: int
-    s: list = field(default_factory=list, repr=False)
+    y: int = None
+    o: list = field(default_factory=list, repr=False)
     d: list = field(default_factory=list, repr=False)
-    g: float
+    g: float = field(default=None, repr=False)
 
-
+    @property
+    def true_y(self):
+        y = min(self.y, 7)
+        if y==0: return [1, 0, 0, 0, 0, 0, 0, 0]
+        return [i/y if i<=y else 0 for i in range(8)]
+    
+    @property
+    def true_g(self):
+        return [self.g for _ in range(4)]
