@@ -13,18 +13,17 @@ os.environ["CURL_CA_BUNDLE"]=""
 # Load Components
 with open('teams.json', 'r') as f:
     teamdict = json.load(f)
-teams = {t:Team(t) for t in teamdict.values()}
+teams = {v:Team(v,k) for k,v in teamdict.items()}
 skaters = {}
 goalies = {}
 data = {}
 
 # 
-def skater_lookup(name):
-    invdict = {skaters[s].name:skaters[s].id for s in skaters}
-    invlist = list(invdict.keys())
-    skname = get_close_matches(name, invlist, n=1)[0]
-    skid = invdict[skname]
-    return skid
+def player_lookup(name, team):
+    invlist = list(team.roster.keys())
+    pname = get_close_matches(name.title(), invlist, n=1)[0]
+    pid = team.roster[pname]
+    return pid
 
 def primary_goalie(goalies):
     tois = len(goalies)*[0]
@@ -55,10 +54,12 @@ for t in teams:
         name = f'{sk8r["firstName"]["default"]} {sk8r["lastName"]["default"]}'
         pos = sk8r["positionCode"]
         skaters[sid] = Skater(sid, name, pos)
+        teams[t].add_player(sid, name)
     for g0ly in resp["goalies"]:
         gid = g0ly["id"]
         name = f'{g0ly["firstName"]["default"]} {g0ly["lastName"]["default"]}'
         goalies[gid] = Goalie(gid, name)
+        teams[t].add_player(gid, name)
 
 # Build Games - Player Statistics
 for szn in ["20232024"]:#["20212022", "20222023", "20232024"]:
@@ -123,12 +124,6 @@ D = [data[dat].d for dat in data]
 G = [[data[dat].g for _ in range(4)] for dat in data]
 Y = [data[dat].true_y for dat in data]
 
-def true_y(y):
-    y = min(y, 7)
-    if y==0: return [1, 0, 0, 0, 0, 0, 0, 0]
-    return [i/y if i<=y else 0 for i in range(8)]
-Y = [true_y(data[dat].y) for dat in data]
-
 # Train model
 from net import KoyoModel
 mod = KoyoModel(bsize=1, epochs=400)
@@ -137,29 +132,115 @@ mod.save("./model/", "model.h5")
 
 # Check model
 mod.predict(O[0:2], D[0:2], G[0:2])
-Y [0:2]
+Y[0:2]
+
+# Driver Imports
+from selenium import webdriver
+from selenium.webdriver.common.keys import Keys
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.common.action_chains import ActionChains
+from webdriver_manager.core.driver_cache import DriverCacheManager
+
+# Driver function
+def get_driver():
+        # Driver options
+        cache_manager=DriverCacheManager("./driver")
+        driver = ChromeDriverManager(cache_manager=cache_manager).install()
+        options = webdriver.ChromeOptions()
+        options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--log-level=3")
+        options.add_argument("--disable-notifications")
+        options.add_argument("--disable-dev-shm-usage")
+        driver = webdriver.Chrome(options=options)
+        return driver
+
+# Fetch Roster
+def get_roster(team, driver):
+
+    # Clean up the team name
+    team = team.replace("é", "e").replace(".", "").replace(" ", "-").lower()
+    driver.get(f"https://www.dailyfaceoff.com/teams/{team}/line-combinations/")
+
+    # Get Skaters
+    f = []
+    f_paths = [
+        [1, "div/", 4, 1], [1, "div/", 4, 2], [1, "div/", 4, 3],
+        [1, "div/", 5, 1], [1, "div/", 5, 2], [1, "div/", 5, 3],
+        [1, "div/", 6, 1], [1, "div/", 6, 2], [1, "div/", 6, 3],
+        [1, "div/", 7, 1], [1, "div/", 7, 2], [1, "div/", 7, 3],
+    ]
+    for path in f_paths:
+        try: sk8r = driver.find_element("xpath", f"//section[@id='line_combos']/div[{path[0]}]/{path[1]}div[{path[2]}]/div[{path[3]}]/div/div[2]/a/span").text
+        except: sk8r = "Not Found"
+        f.append(sk8r)
+
+    # Get Defensemen
+    d = []
+    d_paths = [
+        [2, "", 2, 1], [2, "", 2, 2],
+        [2, "", 3, 1], [2, "", 3, 2],
+        [2, "", 4, 1], [2, "", 4, 2],
+    ]
+    for path in d_paths:
+        try: sk8r = driver.find_element("xpath", 
+                f"//section[@id='line_combos']/div[{path[0]}]/{path[1]}div[{path[2]}]/div[{path[3]}]/div/div[2]/a/span").text
+        except: sk8r = "Not Found"
+        d.append(sk8r)
+
+    # Get Goaltenders
+    g = []
+    for num in [1,2]:
+        try: g0ly = driver.find_element("xpath", 
+                f"//section[@id='line_combos']/div[9]/div[2]/div[{num}]/div/div[2]/a/span").text
+        except: g0ly = "Not Found"
+        g.append(g0ly)
+    
+    # Return info
+    return {"F": f, "D": d, "G": g}
+
+def calc_goals(home_goals, away_goals):
+    probs = np.zeros(len(home_goals)+len(away_goals)-2)
+    for i in np.arange(len(home_goals)-1):
+        for j in np.arange(len(away_goals)-1):
+            probs[i+j] = probs[i+j] + home_goals[i]*away_goals[j]
+    return probs
+
+# Construct an average goalie
+gave = [g.last_game["G10"] for i, g in goalies.items() 
+            if not math.isnan(g.last_game["G10"])
+            and not g.last_game["G10"]==0]
+gave = np.mean(gave)
 
 # Get New Games
+gsk, ggo = {}, {}
+gamedatas = []
+driver = get_driver()
 sch = requests.get(f"https://api-web.nhle.com/v1/schedule/{date.today()}").json()
-sch = requests.get(f"https://api-web.nhle.com/v1/schedule/2024-02-19").json()
+for gg in sch["gameWeek"][0]["games"]:
+    gdat = {"home":{}, "away":{}}
+    gameid = gg['id']
+    homeabb = gg["homeTeam"]["abbrev"]
+    awayabb = gg["awayTeam"]["abbrev"]
+    gdat["home"]["name"] = teams[homeabb].name
+    gdat["away"]["name"] = teams[awayabb].name
+    gdat["home"]["roster"] = get_roster(gdat["home"]["name"], driver)
+    gdat["away"]["roster"] = get_roster(gdat["away"]["name"], driver)
+    gsk["home"] = [player_lookup(sk, teams[homeabb]) for sk in gdat["home"]["roster"]["F"]+gdat["home"]["roster"]["D"]]
+    gsk["away"] = [player_lookup(sk, teams[awayabb]) for sk in gdat["away"]["roster"]["F"]+gdat["away"]["roster"]["D"]]
+    ggo["home"] = player_lookup(gdat["home"]["roster"]["G"][0], teams[homeabb])
+    ggo["away"] = player_lookup(gdat["away"]["roster"]["G"][0], teams[awayabb])
+    # try:
+    for homeaway in ["home", "away"]:
+        awayhome = "away" if homeaway=="home" else "home"
+        o = [skaters[sk].last_game["O10"] for sk in gsk[homeaway]]
+        if any(each!=each for each in o): o = np.nan_to_num(o).tolist()
+        d = [skaters[sk].last_game["D10"] for sk in gsk[awayhome]]
+        if any(each!=each for each in d): o = np.nan_to_num(o).tolist()
+        g = goalies[ggo[awayhome]].last_game["G10"]
+        if math.isnan(g): g = gave
+        gdat[f"{homeaway}_goals"] = mod.predict([o], [d], [[g]])
+    gdat["total_goals"] = calc_goals(gdat["home_goals"], gdat["away_goals"])
+    gamedatas.append(gdat)
+    # except: continue
 
-resp = requests.get(f"https://api-web.nhle.com/v1/gamecenter/{2023020866}/boxscore").json()
-xx = resp["boxscore"]["playerByGameStats"][f"homeTeam"]["forwards"] 
-xx = xx + resp["boxscore"]["playerByGameStats"][f"homeTeam"]["defense"]
-xx = [sk["playerId"] for sk in xx] 
-
-pp.pprint(sch["gameWeek"][0]["games"][0])
-len(sch["gameWeek"][0]["games"])
-sch.keys()
-
-# Parters:
-    # 9: DraftKings
-    # 7: FanDuel
-# sch = requests.get(f"https://api-web.nhle.com/v1/schedule/{date.today()}").json()
-# games = sch["gameWeek"][0]["games"]
-# for game in games:
-#     id = game["id"]
-#     home = game["homeTeam"]["abbrev"]
-#     away = game["awayTeam"]["abbrev"]
-#     print(f'ID: {id} |Home: {home} | Away: {away}')
-# pp.pprint(games)

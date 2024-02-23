@@ -1,0 +1,99 @@
+<html>
+    <head>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+        <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+        <style>
+            .centered_table {
+                margin-left: auto;
+                margin-right: auto;
+            }
+            td image{
+                display: block;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            h1{font-size: 42px;}
+            h2{font-size: 32px;}
+            h3{font-size: 28px;}
+            p{font-size: 16px;}
+            .green{color: #028A0F;}
+            .yellow{color: #a0910b;}
+            .orange{color: #ff5f15}
+            .red{color: #ff0000;}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            
+            <!-- TITLE PAGE -->
+            <div class="row w-100" style="padding-top:300px">
+                <div class="text-center">
+                    <img src="https://gallery.yopriceville.com/var/albums/Free-Clipart-Pictures/Fall-PNG/Autumn_Leaf_Transparent_PNG_Clip_Art_Image.png" width="100px" height="160px"/>
+                    <h1 style="padding-top:10px">{{ name }}</h1>
+                    <h3 style="padding-top:6px">Lakshmi v5.1</h3>
+                </div>
+            </div>
+            <div style="page-break-before: always;"></div>
+
+            {% for game in games %}
+
+            <!-- GAME SUMMARY PAGE -->
+            <div class="row w-100">
+                <div class="text-center">
+                    <hr />
+                    <h1>{{ game['away'] }} @ {{ game['home'] }}</h1>
+                    <hr />
+                </div> 
+            </div>
+            <br />
+
+            <!-- <p class="green"></p>
+            {% if game['odds']['Home Win Probability'] > game['odds']['Away Win Probability'] %} -->
+            
+            <div class="row w-100" style="padding-top:50px">
+                <div class="text-center">
+                    <h2 style="padding-bottom: 20px;">Goal Probabilities</h2>
+                </div>
+                <table class="centered_table">
+                    <tr style="border-bottom: 1px solid black;">
+                        <th><p>{{ game['home']['name'] }}</p></th>
+                        <th><p>{{ game['away']['name'] }}</p></th>
+                    </tr>
+                    <tr>
+                        <td>
+                            <img src="{{ game['home']['distribution'] }}" width="400px" height="400px" />
+                        </td>
+                        <td>
+                            <img src="{{ game['away']['distribution'] }}" width="400px" height="400px" />
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="row w-100" style="padding-top:50px">
+                <div class="text-center">
+                    <h2 style="padding-bottom: 20px;">Goal Distributions</h2>
+                </div>
+                <table class="centered_table">
+                    <tr style="border-bottom: 1px solid black;">
+                        <th><p>{{ game['home']['name'] }}</p></th>
+                        <th><p>{{ game['away']['name'] }}</p></th>
+                    </tr>
+                    <tr>
+                        <td>
+                            <img src="{{ game['home']['distribution'] }}" width="400px" height="400px" />
+                        </td>
+                        <td>
+                            <img src="{{ game['away']['distribution'] }}" width="400px" height="400px" />
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div style="page-break-before: always;"></div>
+
+            {% endfor %}
+        </div>
+    </body>
+</html>

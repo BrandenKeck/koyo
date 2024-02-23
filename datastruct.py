@@ -10,7 +10,11 @@ def toi_to_minutes(toi: str) -> float:
 @dataclass
 class Team():
     id: str
+    name: str
+    roster: dict = field(default_factory=dict, repr=False)
     games: dict = field(default_factory=dict, repr=False)
+    def add_player(self, id, name):
+        self.roster[name] = id
     def add_game(self, game, homeaway):
         opp = "away" if homeaway=="home" else "home"
         gameid = game["id"]
@@ -47,7 +51,13 @@ class Skater():
             dat[f'O{win}'] = dat['O'].rolling(win).mean()
             dat[f'D{win}'] = dat['D'].rolling(win).mean()
             self.games = dat.to_dict(orient='index')
-
+    @property
+    def last_game(self):
+        gameids = list(self.games.keys())
+        if len(gameids)>0:
+            lastid = gameids[-1]
+            return self.games[lastid]
+        return {"O10": 0, "D10": 0}
 @dataclass
 class Goalie():
     id: int
@@ -68,6 +78,13 @@ class Goalie():
             dat = pd.DataFrame.from_dict(self.games, orient='index')
             dat[f'G{win}'] = dat['G'].rolling(win).mean()
             self.games = dat.to_dict(orient='index')
+    @property
+    def last_game(self):
+        gameids = list(self.games.keys())
+        if len(gameids)>0:
+            lastid = gameids[-1]
+            return self.games[lastid]
+        return {"G10": 0}
 
 @dataclass
 class KoyoData():
