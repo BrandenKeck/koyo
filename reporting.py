@@ -1,4 +1,4 @@
-import jinja2, pdfkit, shutil, json, uuid
+import os, jinja2, pdfkit, json, uuid
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -13,8 +13,14 @@ class KoyoReport():
 
     def generate(self, data):
 
+        # Empty Images Directory
+        for f in os.listdir("./report/img/"):
+            os.remove("./report/img/"+f)
+
         # Generate Histograms
-        pass
+        for idx, game in enumerate(data):
+            data[idx]['home']['distribution'] = self.build_team_histogram(data[idx]["home_goals"])
+            data[idx]['away']['distribution'] = self.build_team_histogram(data[idx]["away_goals"])
         
         # Generate PDF Report
         context = {'name': self.name, 'games': data}
@@ -28,9 +34,10 @@ class KoyoReport():
         # shutil.copyfile(f'F:/floating_repos/lakshmi/reports/{self.name}.pdf', f'C:/Users/kril/Dropbox/Lakshmi/{self.name}.pdf')
 
     def build_team_histogram(self, data):
-        file = f'./reports/img/{str(uuid.uuid4())}.png'
+        file = f'./report/img/{str(uuid.uuid4())}.png'
         fig = plt.figure(figsize=(5, 5))
-        plt.hist(data, bins=np.arange(13))
+        plt.bar(np.arange(len(data)), data, tick_label=np.arange(len(data)))
+        plt.yticks(color='w')
         plt.savefig(file)
         plt.close('all')
         return file

@@ -118,6 +118,27 @@ for game in games:
         except: continue
         data[f"{game}_{homeaway}"] = KoyoData(game, y, o, d, g)
 
+# Just Pickle Everything for Now
+import pickle
+with open('pickles/teams.pickle', 'wb') as f: 
+    pickle.dump(teams, f, protocol=pickle.HIGHEST_PROTOCOL)
+with open('pickles/skaters.pickle', 'wb') as f: 
+    pickle.dump(skaters, f, protocol=pickle.HIGHEST_PROTOCOL)
+with open('pickles/goalies.pickle', 'wb') as f: 
+    pickle.dump(goalies, f, protocol=pickle.HIGHEST_PROTOCOL)
+with open('pickles/data.pickle', 'wb') as f: 
+    pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+###
+# CHECKPOINT
+###
+
+# Unpickle for the next part of testing
+with open('pickles/teams.pickle', 'rb') as f: teams = pickle.load(f)
+with open('pickles/skaters.pickle', 'rb') as f: skaters = pickle.load(f)
+with open('pickles/goalies.pickle', 'rb') as f: goalies = pickle.load(f)
+with open('pickles/data.pickle', 'rb') as f: data = pickle.load(f)
+
 # Construct data vectors
 O = [data[dat].o for dat in data]
 D = [data[dat].d for dat in data]
@@ -203,7 +224,10 @@ def calc_goals(home_goals, away_goals):
     probs = np.zeros(len(home_goals)+len(away_goals)-2)
     for i in np.arange(len(home_goals)-1):
         for j in np.arange(len(away_goals)-1):
-            probs[i+j] = probs[i+j] + home_goals[i]*away_goals[j]
+            if i==j:
+                probs[i+j+1] = probs[i+j+1] + home_goals[i]*away_goals[j]
+            else:
+                probs[i+j] = probs[i+j] + home_goals[i]*away_goals[j]
     return probs
 
 # Construct an average goalie
@@ -213,9 +237,9 @@ gave = [g.last_game["G10"] for i, g in goalies.items()
 gave = np.mean(gave)
 
 # Get New Games
+driver = get_driver()
 gsk, ggo = {}, {}
 gamedatas = []
-driver = get_driver()
 sch = requests.get(f"https://api-web.nhle.com/v1/schedule/{date.today()}").json()
 for gg in sch["gameWeek"][0]["games"]:
     gdat = {"home":{}, "away":{}}
@@ -230,17 +254,19 @@ for gg in sch["gameWeek"][0]["games"]:
     gsk["away"] = [player_lookup(sk, teams[awayabb]) for sk in gdat["away"]["roster"]["F"]+gdat["away"]["roster"]["D"]]
     ggo["home"] = player_lookup(gdat["home"]["roster"]["G"][0], teams[homeabb])
     ggo["away"] = player_lookup(gdat["away"]["roster"]["G"][0], teams[awayabb])
-    # try:
     for homeaway in ["home", "away"]:
         awayhome = "away" if homeaway=="home" else "home"
         o = [skaters[sk].last_game["O10"] for sk in gsk[homeaway]]
         if any(each!=each for each in o): o = np.nan_to_num(o).tolist()
         d = [skaters[sk].last_game["D10"] for sk in gsk[awayhome]]
-        if any(each!=each for each in d): o = np.nan_to_num(o).tolist()
+        if any(each!=each for each in d): d = np.nan_to_num(d).tolist()
         g = goalies[ggo[awayhome]].last_game["G10"]
         if math.isnan(g): g = gave
-        gdat[f"{homeaway}_goals"] = mod.predict([o], [d], [[g]])
+        gdat[f"{homeaway}_goals"] = mod.predict([o], [d], [4*[g]]).tolist()[0]
     gdat["total_goals"] = calc_goals(gdat["home_goals"], gdat["away_goals"])
     gamedatas.append(gdat)
-    # except: continue
+
+from reporting import KoyoReport
+krep = KoyoReport()
+krep.generate(gamedatas)
 

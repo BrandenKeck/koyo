@@ -30,9 +30,9 @@
             <!-- TITLE PAGE -->
             <div class="row w-100" style="padding-top:300px">
                 <div class="text-center">
-                    <img src="https://gallery.yopriceville.com/var/albums/Free-Clipart-Pictures/Fall-PNG/Autumn_Leaf_Transparent_PNG_Clip_Art_Image.png" width="100px" height="160px"/>
+                    <img src="https://gallery.yopriceville.com/var/albums/Free-Clipart-Pictures/Fall-PNG/Autumn_Leaf_Transparent_PNG_Clip_Art_Image.png" width="120px" height="160px"/>
                     <h1 style="padding-top:10px">{{ name }}</h1>
-                    <h3 style="padding-top:6px">Lakshmi v5.1</h3>
+                    <h3 style="padding-top:6px">Koyo v0.1</h3>
                 </div>
             </div>
             <div style="page-break-before: always;"></div>
@@ -43,34 +43,11 @@
             <div class="row w-100">
                 <div class="text-center">
                     <hr />
-                    <h1>{{ game['away'] }} @ {{ game['home'] }}</h1>
+                    <h1>{{ game['away']['name'] }} @ {{ game['home']['name'] }}</h1>
                     <hr />
                 </div> 
             </div>
             <br />
-
-            <!-- <p class="green"></p>
-            {% if game['odds']['Home Win Probability'] > game['odds']['Away Win Probability'] %} -->
-            
-            <div class="row w-100" style="padding-top:50px">
-                <div class="text-center">
-                    <h2 style="padding-bottom: 20px;">Goal Probabilities</h2>
-                </div>
-                <table class="centered_table">
-                    <tr style="border-bottom: 1px solid black;">
-                        <th><p>{{ game['home']['name'] }}</p></th>
-                        <th><p>{{ game['away']['name'] }}</p></th>
-                    </tr>
-                    <tr>
-                        <td>
-                            <img src="{{ game['home']['distribution'] }}" width="400px" height="400px" />
-                        </td>
-                        <td>
-                            <img src="{{ game['away']['distribution'] }}" width="400px" height="400px" />
-                        </td>
-                    </tr>
-                </table>
-            </div>
 
             <div class="row w-100" style="padding-top:50px">
                 <div class="text-center">
